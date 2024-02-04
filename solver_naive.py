@@ -10,4 +10,5 @@ def solve(instance: Instance) -> Solution:
         Solution: A solution object initialized with 
                   a list of tuples of the form (<artipiece_id>, <wall_id>, <x_pos>, <y_pos>)
     """
+    print(instance.wall)
     return Solution([(i,i,0,0) for i in instance.artpieces_dict.keys()])
