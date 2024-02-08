@@ -8,66 +8,53 @@ class CustomWall(Wall):
     """
     def __init__(self, w, h):
         super().__init__(w, h)
-        self.matrix_place = np.zeros((w,h))
-        self.max_rect = (w,h)
-        self.coord_max_rect = (0,0)
+        self.matrix_place = np.zeros((w, h))
+        self.max_rect_size = (w, h)
+        self.max_rect_coord = (0, 0)
 
     def maj_ajout_artpiece(self, art_piece,x,y):
-        print(self.matrix_place)
         #ajout du tableau au dictionnaire du mur
         self._artpieces[art_piece.get_idx()] = (x,y)
 
         #mise a jour de la matrice de masque
-        w,h = art_piece.width(), art_piece.height()
-        self.matrix_place[x:x+w,y:y+h] += 1
-        self.max_rect, self.coord_max_rect = self.maximalRectangle()
+        w, h = art_piece.width(), art_piece.height()
+        self.matrix_place[x:x+w, y:y+h] = 1
+
+        self.max_rect_size, self.max_rect_coord = self.maximalRectangle()
     
 
     def maximalRectangle(self):
-        matrix = self.matrix_place
+        """
+        Retourne la zone rectangulaire remplie de 0 la plus grande sur le mur.
 
-        
-    
+        Hypothèse simplificatrice : on remplit toujours le mur par le coin inférieur gauche.
+            - on peut parcourir la matrice une seule fois pour obtenir les régions contiguës de 0 (heights)
+            - on peut déduire rapidement la taille et la coordonnée des zones de 0 avec les valeurs contiguës dans heights.
+        """
 
-        def largestRectangleArea(heights):
-            stack = []
-            max_area = 0
-            max_area_coordinates = (0, 0, 0, 0)  # (x_min, y_min, x_max, y_max)
+        heights = [0] * self._w
+        for j in range(self._h):
+            for i in range(self._w):
+                if self.matrix_place[i][j] == 0:
+                    heights[i] = heights[i] + 1
+                else:
+                    heights[i] = 0
 
-            for i, h in enumerate(heights + [0]):
-                while stack and h < heights[stack[-1]]:
-                    height = heights[stack.pop()]
-                    width = i if not stack else i - stack[-1] - 1
-                    current_area = height * width
+        if heights[0] > 0:
+            max_rect_size = (self._w, heights[0])
+            max_rect_coord = (0, self._h - heights[0])
+        else:
+            max_rect_size = (0, 0)
+            max_rect_coord = (None, None)
 
-                    if current_area > max_area:
-                        max_area = current_area
-                        max_area_coordinates = (stack[-1] + 1, height, i - 1, height)
+        for h in range(1, self._w):
+            if heights[h] > max_rect_size[1]:
+                # On teste seulement pour une section de hauteur différente (sinon, c'est la même qu'avant mais tronquée)
+                if heights[h]*(self._w - h + 1) > max_rect_size[0]*max_rect_size[1]:
+                    max_rect_size = (self._w - h, heights[h])
+                    max_rect_coord = (h, self._h - heights[h])
 
-                stack.append(i)
-
-            return max_area, max_area_coordinates
-
-        rows = len(matrix)
-        cols = len(matrix[0]) if rows > 0 else 0
-        max_area = 0
-        max_area_coordinates = (0, 0, 0, 0)
-
-        for i in range(rows):
-            heights = [0] * cols
-
-            for j in range(cols):
-                if matrix[i][j] == 0:
-                    heights[j] = heights[j - 1] + 1 if j > 0 else 1
-
-            current_area, current_coordinates = largestRectangleArea(heights)
-
-            if current_area > max_area:
-                max_area = current_area
-                max_area_coordinates = (current_coordinates[0], i - current_coordinates[1] + 1, current_coordinates[2], i)
-
-
-        return (max_area_coordinates[2]-max_area_coordinates[0],max_area_coordinates[3]-max_area_coordinates[1]), (max_area_coordinates[0], max_area_coordinates[1])
+        return max_rect_size, max_rect_coord
 
 
     
@@ -87,8 +74,14 @@ def solve(instance: Instance) -> Solution:
     walls = []
     wallw, wallh = instance.wall.width(), instance.wall.height()
 
+    # Tri des tableaux par aire décroissante.
+    artpieces = sorted(instance.artpieces_dict.items(),
+                       key = lambda x: instance.artpieces_dict[x[0]].width()*instance.artpieces_dict[x[0]].height(),
+                       reverse = True)
+
     #Pour chaque oeuvre on essaye de la mettre sur un mur deja occupe
-    for id, art_piece in instance.artpieces_dict.items():
+    for _, art_piece in artpieces:
+        art_piece.width(), art_piece.height()
         
         placed = False
         w,h  = art_piece.width(), art_piece.height()
@@ -97,21 +90,17 @@ def solve(instance: Instance) -> Solution:
         for wall in walls:
             if not placed :
 
-                x,y = wall.coord_max_rect
-                print(x,y)
-                W,H = wall.max_rect
-                if w <= W and h<= H:
+                x, y = wall.max_rect_coord
+                W, H = wall.max_rect_size
 
-                    wall.maj_ajout_artpiece(art_piece,x,y)
+                if w <= W and h <= H:
+                    wall.maj_ajout_artpiece(art_piece, x, y)
                     placed = True
-
 
         #sinon on la met sur un nouveau mur
         if not placed:
-            walls.append(CustomWall(wallw,wallh))
-            walls[-1].maj_ajout_artpiece(art_piece,0,0)
-
-    
+            walls.append(CustomWall(wallw, wallh))
+            walls[-1].maj_ajout_artpiece(art_piece, 0, 0)    
 
         
     solution = []
