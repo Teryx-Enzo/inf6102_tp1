@@ -57,19 +57,20 @@ class CustomWall(Wall):
         return max_rect_size, max_rect_coord
 
 
+def initial_naive(instance: Instance) -> List:
+    walls = []
+    wallw, wallh = instance.wall.width(), instance.wall.height()
     
-    
+    for i in instance.artpieces_dict:
+        walls.append(CustomWall(wallw, wallh))
+        walls[-1].maj_ajout_artpiece(instance.artpieces_dict[i], 0, 0)
 
-    
-def solve(instance: Instance) -> Solution:
-    """Write your code here
+    return walls
 
-    Args:
-        instance (Instance): An Instance object containing all you need to solve the problem
 
-    Returns:
-        Solution: A solution object initialized with 
-                  a list of tuples of the form (<artipiece_id>, <wall_id>, <x_pos>, <y_pos>)
+def initial_greedy(instance: Instance) -> List:
+    """
+    Génère une solution initiale gloutonne en plaçant les tableaux par surface décroissante.
     """
     walls = []
     wallw, wallh = instance.wall.width(), instance.wall.height()
@@ -100,7 +101,22 @@ def solve(instance: Instance) -> Solution:
         #sinon on la met sur un nouveau mur
         if not placed:
             walls.append(CustomWall(wallw, wallh))
-            walls[-1].maj_ajout_artpiece(art_piece, 0, 0)    
+            walls[-1].maj_ajout_artpiece(art_piece, 0, 0)
+    
+    return walls
+
+
+def solve(instance: Instance) -> Solution:
+    """Write your code here
+
+    Args:
+        instance (Instance): An Instance object containing all you need to solve the problem
+
+    Returns:
+        Solution: A solution object initialized with 
+                  a list of tuples of the form (<artipiece_id>, <wall_id>, <x_pos>, <y_pos>)
+    """
+    walls = initial_naive(instance)
 
         
     solution = []
