@@ -1,18 +1,20 @@
 from utils import *
 import numpy as np
+from random import choice
 
 class CustomWall(Wall):
-
-    """ You are completely free to extend classes defined in utils,
-        this might prove useful or enhance code readability
+    """ 
+    You are completely free to extend classes defined in utils,
+    this might prove useful or enhance code readability
     """
+
     def __init__(self, w, h):
         super().__init__(w, h)
         self.matrix_place = np.zeros((w, h))
         self.max_rect_size = (w, h)
         self.max_rect_coord = (0, 0)
 
-    def maj_ajout_artpiece(self, art_piece,x,y):
+    def maj_ajout_artpiece(self, art_piece, x, y):
         #ajout du tableau au dictionnaire du mur
         self._artpieces[art_piece.get_idx()] = (x,y)
 
@@ -22,6 +24,19 @@ class CustomWall(Wall):
 
         self.max_rect_size, self.max_rect_coord = self.maximalRectangle()
     
+    def retrait_artpiece(self, art_piece):
+        x, y = self._artpieces[art_piece.get_idx()]
+
+        # Mise à zéro de la matrice de masque
+        w, h = art_piece.width(), art_piece.height()
+        self.matrix_place[x:x+w, y:y+h] = 0
+
+        # Suppression de la pièce
+        self._artpieces.pop(art_piece.get_idx())
+
+        self.max_rect_size, self.max_rect_coord = self.maximalRectangle()
+
+        return x, y # Pour pouvoir éventuellement annuler
 
     def maximalRectangle(self):
         """
@@ -53,23 +68,27 @@ class CustomWall(Wall):
                 if heights[h]*(self._w - h + 1) > max_rect_size[0]*max_rect_size[1]:
                     max_rect_size = (self._w - h, heights[h])
                     max_rect_coord = (h, self._h - heights[h])
+            elif heights[h] < max_rect_size[1]:
+                max_rect_size = (self._w - h, heights[h])
+                max_rect_coord = (max_rect_coord[0], self._h - heights[h])
 
         return max_rect_size, max_rect_coord
 
 
+def initial_naive(instance: Instance) -> List:
+    walls = []
+    wallw, wallh = instance.wall.width(), instance.wall.height()
     
-    
+    for i in instance.artpieces_dict:
+        walls.append(CustomWall(wallw, wallh))
+        walls[-1].maj_ajout_artpiece(instance.artpieces_dict[i], 0, 0)
 
-    
-def solve(instance: Instance) -> Solution:
-    """Write your code here
+    return walls
 
-    Args:
-        instance (Instance): An Instance object containing all you need to solve the problem
 
-    Returns:
-        Solution: A solution object initialized with 
-                  a list of tuples of the form (<artipiece_id>, <wall_id>, <x_pos>, <y_pos>)
+def initial_greedy(instance: Instance) -> List:
+    """
+    Génère une solution initiale gloutonne en plaçant les tableaux par surface décroissante.
     """
     walls = []
     wallw, wallh = instance.wall.width(), instance.wall.height()
@@ -100,11 +119,54 @@ def solve(instance: Instance) -> Solution:
         #sinon on la met sur un nouveau mur
         if not placed:
             walls.append(CustomWall(wallw, wallh))
-            walls[-1].maj_ajout_artpiece(art_piece, 0, 0)    
+            walls[-1].maj_ajout_artpiece(art_piece, 0, 0)
+    
+    return walls
 
+
+def solve(instance: Instance) -> Solution:
+    """Write your code here
+
+    Args:
+        instance (Instance): An Instance object containing all you need to solve the problem
+
+    Returns:
+        Solution: A solution object initialized with 
+                  a list of tuples of the form (<artipiece_id>, <wall_id>, <x_pos>, <y_pos>)
+    """
+    walls = initial_greedy(instance)
+
+    # for _ in range(100): # Critère d'arrêt à définir
+    #     temp_walls = walls.copy()
+
+    #     # À étoffer : choisir un mur de départ et un mur cible en particulier !
+    #     o = choice(range(len(temp_walls)))
+    #     n = choice(list(range(o)) + list(range(o+1, len(temp_walls))))  # Choisir 2 murs distincts
+    #     old_wall = temp_walls[o]
+    #     new_wall = temp_walls[n]
+
+    #     # À étoffer aussi : heuristique pr choisir un bon tableau
+    #     art = choice(list(old_wall._artpieces)) # On ne récupère que l'index
+    #     x, y = old_wall.retrait_artpiece(instance.artpieces_dict[art])
+    #     new_wall.maj_ajout_artpiece(instance.artpieces_dict[art], *new_wall.max_rect_coord)
+
+    #     if len(old_wall._artpieces) == 0:
+    #         temp_walls.remove(old_wall)
+
+    #     solution = []
+    #     for i in range(len(temp_walls)):
+    #         solution += temp_walls[i].gen_for_solution(i)
         
+    #     if instance.is_valid_solution(Solution(solution)):
+    #         walls = temp_walls
+    #     else:
+    #         old_wall.maj_ajout_artpiece(instance.artpieces_dict[art], x, y)
+    #         _, _ = new_wall.retrait_artpiece(instance.artpieces_dict[art])
+
+
     solution = []
     for i in range(len(walls)):
         solution += walls[i].gen_for_solution(i)
+            
 
     return Solution(solution)
