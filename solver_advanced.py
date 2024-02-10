@@ -25,19 +25,30 @@ class CustomWall(Wall):
 
         self.max_rect_size, self.max_rect_coord = self.maximalRectangle()
 
-        if x + art_piece.width() < self.width() and y + art_piece.height() < self.height():
-            # Mise à jour de la liste des coins
-            self.coins_bas_gauche.remove((x, y))
+        # Mise à jour de la liste des coins
+        self.coins_bas_gauche.discard((x, y))
+        if y + art_piece.height() < self.height(): # Sanity check pour éviter les erreur d'OOB
+
             #Coin à gauche de la pièce
-            self.coins_bas_gauche.add((x, y + art_piece.height()))
-            #Coin juste à droite de la pièce
-            if x + art_piece.width() < self.width() and y + art_piece.height() < self.height():
-                for j in range(y+art_piece.height())[::-1]:
-                    if self.matrix_place[x + art_piece.width(), j] == 1:
-                        self.coins_bas_gauche.add((x + art_piece.width(), j+1))
-                        break
-                    if j == 0: self.coins_bas_gauche.add((x + art_piece.width(), 0))
+            if self.matrix_place[x, y + art_piece.height()] == 0:
+                self.coins_bas_gauche.add((x, y + art_piece.height()))
+            
+            if x + art_piece.width() < self.width():
+                #Coin juste à droite de la pièce
+                for j in range(y, y+art_piece.height())[::-1]:
+                    #if self.matrix_place[x + art_piece.width() - 1, j] == 1: # S'il y a un tableau à gauche
+                    if (j > 0 and
+                        self.matrix_place[x + art_piece.width(), j] == 0 and
+                        self.matrix_place[x + art_piece.width(), j-1] == 1):
+                        # On rencontre un tableau en descendant (passer de 0 à 1)
+                        self.coins_bas_gauche.add((x + art_piece.width(), j))
+                    if j == 0: # On arrive tout en bas
+                        self.coins_bas_gauche.add((x + art_piece.width(), 0))
+                
+                #print(self.matrix_place, self.coins_bas_gauche)
+                #input('e')
     
+
     def retrait_artpiece(self, art_piece):
         x, y = self._artpieces[art_piece.get_idx()]
 
@@ -50,8 +61,11 @@ class CustomWall(Wall):
 
         self.max_rect_size, self.max_rect_coord = self.maximalRectangle()
 
-        # Rajout des coordonnées du tableau dans la liste des coins
-        self.coins_bas_gauche.add((x, y))
+        # Mise à jour de la liste des coins
+        self.coins_bas_gauche.add((x, y))  # Rajout des coordonnées du tableau dans la liste des coins
+        self.coins_bas_gauche.discard((x, y + art_piece.height()))
+        for j in range(y, y+art_piece.height())[::-1]:
+            self.coins_bas_gauche.discard(((x + art_piece.width(), j)))
 
         return x, y # Pour pouvoir éventuellement annuler
 
@@ -153,7 +167,7 @@ def solve(instance: Instance) -> Solution:
     """
     walls = initial_greedy(instance)
 
-    for _ in range(100): # Critère d'arrêt à définir
+    for _ in range(50): # Critère d'arrêt à définir
         temp_walls = walls.copy()
 
         # À étoffer : choisir un mur de départ et un mur cible en particulier !
@@ -166,7 +180,7 @@ def solve(instance: Instance) -> Solution:
         art = choice(list(old_wall._artpieces)) # On ne récupère que l'index
         x, y = old_wall.retrait_artpiece(instance.artpieces_dict[art])
         coin_bg = choice(list(new_wall.coins_bas_gauche))
-        #print(new_wall.coins_bas_gauche, coin_bg, instance.artpieces_dict[art].width(), instance.artpieces_dict[art].height())
+        print(new_wall.coins_bas_gauche, coin_bg, instance.artpieces_dict[art].width(), instance.artpieces_dict[art].height())
         new_wall.maj_ajout_artpiece(instance.artpieces_dict[art], *coin_bg)
 
         solution = []
