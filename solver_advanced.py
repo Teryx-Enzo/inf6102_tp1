@@ -68,6 +68,9 @@ class CustomWall(Wall):
                 if heights[h]*(self._w - h + 1) > max_rect_size[0]*max_rect_size[1]:
                     max_rect_size = (self._w - h, heights[h])
                     max_rect_coord = (h, self._h - heights[h])
+            elif heights[h] < max_rect_size[1]:
+                max_rect_size = (self._w - h, heights[h])
+                max_rect_coord = (max_rect_coord[0], self._h - heights[h])
 
         return max_rect_size, max_rect_coord
 
@@ -131,34 +134,39 @@ def solve(instance: Instance) -> Solution:
         Solution: A solution object initialized with 
                   a list of tuples of the form (<artipiece_id>, <wall_id>, <x_pos>, <y_pos>)
     """
-    walls = initial_naive(instance)
+    walls = initial_greedy(instance)
 
-    for _ in range(500): # Critère d'arrêt à définir
-        temp_walls = walls.copy()
+    # for _ in range(100): # Critère d'arrêt à définir
+    #     temp_walls = walls.copy()
 
-        # À étoffer : choisir un mur de départ et un mur cible en particulier !
-        o = choice(range(len(temp_walls)))
-        n = choice(list(range(o)) + list(range(o+1, len(temp_walls))))  # Choisir 2 murs distincts
-        old_wall = temp_walls[o]
-        new_wall = temp_walls[n]
+    #     # À étoffer : choisir un mur de départ et un mur cible en particulier !
+    #     o = choice(range(len(temp_walls)))
+    #     n = choice(list(range(o)) + list(range(o+1, len(temp_walls))))  # Choisir 2 murs distincts
+    #     old_wall = temp_walls[o]
+    #     new_wall = temp_walls[n]
 
-        # À étoffer aussi : heuristique pr choisir un bon tableau
-        art = choice(list(old_wall._artpieces)) # On ne récupère que l'index
-        x, y = old_wall.retrait_artpiece(instance.artpieces_dict[art])
-        new_wall.maj_ajout_artpiece(instance.artpieces_dict[art], *new_wall.max_rect_coord)
+    #     # À étoffer aussi : heuristique pr choisir un bon tableau
+    #     art = choice(list(old_wall._artpieces)) # On ne récupère que l'index
+    #     x, y = old_wall.retrait_artpiece(instance.artpieces_dict[art])
+    #     new_wall.maj_ajout_artpiece(instance.artpieces_dict[art], *new_wall.max_rect_coord)
 
-        if len(old_wall._artpieces) == 0:
-            temp_walls.remove(old_wall)
+    #     if len(old_wall._artpieces) == 0:
+    #         temp_walls.remove(old_wall)
 
-        solution = []
-        for i in range(len(temp_walls)):
-            solution += temp_walls[i].gen_for_solution(i)
+    #     solution = []
+    #     for i in range(len(temp_walls)):
+    #         solution += temp_walls[i].gen_for_solution(i)
         
-        if instance.is_valid_solution(Solution(solution)):
-            walls = temp_walls
-        else:
-            old_wall.maj_ajout_artpiece(instance.artpieces_dict[art], x, y)
-            _, _ = new_wall.retrait_artpiece(instance.artpieces_dict[art])
+    #     if instance.is_valid_solution(Solution(solution)):
+    #         walls = temp_walls
+    #     else:
+    #         old_wall.maj_ajout_artpiece(instance.artpieces_dict[art], x, y)
+    #         _, _ = new_wall.retrait_artpiece(instance.artpieces_dict[art])
 
+
+    solution = []
+    for i in range(len(walls)):
+        solution += walls[i].gen_for_solution(i)
+            
 
     return Solution(solution)
