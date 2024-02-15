@@ -1,6 +1,7 @@
 from utils import *
 import numpy as np
-from random import choice
+from random import choices
+from time import time
 
 class CustomWall(Wall):
     """ 
@@ -32,10 +33,10 @@ class CustomWall(Wall):
             # Coin à en haut-gauche de la pièce
             if self.matrix_place[x, y + art_piece.height()] == 0:
                 self.coins_bas_gauche.add((x, y + art_piece.height()))
-            
-            if x > 0:
-                # Coin en haut de la pièce
-                for i in range(art_piece.width()):
+
+            # Coin en haut de la pièce
+            for i in range(art_piece.width()):
+                if x + i > 0:
                     if (self.matrix_place[x + i - 1, y + art_piece.height()] == 1 and 
                         self.matrix_place[x + i, y + art_piece.height()] == 0):
                         self.coins_bas_gauche.add((x + i, y + art_piece.height()))
@@ -45,16 +46,16 @@ class CustomWall(Wall):
             if self.matrix_place[x + art_piece.width(), y] == 0:
                 self.coins_bas_gauche.add((x + art_piece.width(), y))
             
-            if y > 0:
-                # Coins à droite de la pièce
-                for j in range(art_piece.height()):
+            # Coins à droite de la pièce
+            for j in range(art_piece.height()):
+                if y + j > 0:
                     if (self.matrix_place[x + art_piece.width(), y + j - 1] == 1 and
                         self.matrix_place[x + art_piece.width(), y + j] == 0):
                         self.coins_bas_gauche.add((x + art_piece.width(), y + j))
                 
             #print(self.matrix_place, self.coins_bas_gauche)
             #input('e')
-    
+
 
     def retrait_artpiece(self, art_piece):
         x, y = self._artpieces[art_piece.get_idx()]
@@ -78,6 +79,7 @@ class CustomWall(Wall):
             self.coins_bas_gauche.discard((x + art_piece.width(), y + j))
 
         return x, y # Pour pouvoir éventuellement annuler
+
 
     def maximalRectangle(self):
         """
@@ -175,40 +177,63 @@ def solve(instance: Instance) -> Solution:
         Solution: A solution object initialized with 
                   a list of tuples of the form (<artipiece_id>, <wall_id>, <x_pos>, <y_pos>)
     """
-    walls = initial_greedy(instance)
+    t0 = time()
 
-    for _ in range(5000): # Critère d'arrêt à définir
-        temp_walls = walls.copy()
+    sol_star = None
+    wall_star = len(instance.artpieces_dict)
 
-        # À étoffer : choisir un mur de départ et un mur cible en particulier !
-        o = choice(range(len(temp_walls)))
-        n = choice(range(len(temp_walls)))  # Choisir 2 murs distincts
-        old_wall = temp_walls[o]
-        new_wall = temp_walls[n]
+    if 'easy' in instance.filepath:
+        credit_temps = 45  #60
+    else:
+        credit_temps = 75 #300
 
-        # À étoffer aussi : heuristique pr choisir un bon tableau
-        art = choice(list(old_wall._artpieces)) # On ne récupère que l'index
-        x, y = old_wall.retrait_artpiece(instance.artpieces_dict[art])
-        #print(new_wall.coins_bas_gauche, new_wall._artpieces, new_wall.matrix_place)
-        coin_bg = choice(list(new_wall.coins_bas_gauche))
-        #print(new_wall.coins_bas_gauche, coin_bg, instance.artpieces_dict[art].width(), instance.artpieces_dict[art].height())
-        new_wall.maj_ajout_artpiece(instance.artpieces_dict[art], *coin_bg)
+    while time() - t0 < credit_temps:
+        print("c'est parti !")
+        walls = initial_greedy(instance)
+        non_improving_iterations = 0
 
-        solution = []
-        for i in range(len(temp_walls)):
-            solution += temp_walls[i].gen_for_solution(i)
+        while non_improving_iterations < 100: # Critère d'arrêt à définir
+            temp_walls = walls.copy()
+
+            # À étoffer : choisir un mur de départ et un mur cible en particulier !
+            o = choices(range(len(temp_walls)), weights = map(lambda x: 1/len(x._artpieces), temp_walls))[0]
+            n = choices(range(len(temp_walls)), weights = map(lambda x: np.count_nonzero(x.matrix_place==0), temp_walls))[0]
+            old_wall = temp_walls[o]
+            new_wall = temp_walls[n]
+
+            # À étoffer aussi : heuristique pr choisir un bon tableau
+            art = choices(list(old_wall._artpieces), 
+                          weights = map(lambda x: 1e-16+old_wall._artpieces[x][0]**2 + old_wall._artpieces[x][1]**2, old_wall._artpieces))[0] # On ne récupère que l'index
+            x, y = old_wall.retrait_artpiece(instance.artpieces_dict[art])
+            #print(new_wall.coins_bas_gauche, new_wall._artpieces, new_wall.matrix_place)
+            coin_bg = choices(list(new_wall.coins_bas_gauche), weights = map(lambda x: 1/(1 + x[0]*x[1]), new_wall.coins_bas_gauche))[0]
+            #print(new_wall.coins_bas_gauche, coin_bg, instance.artpieces_dict[art].width(), instance.artpieces_dict[art].height())
+            new_wall.maj_ajout_artpiece(instance.artpieces_dict[art], *coin_bg)
+
+            solution = []
+            for i in range(len(temp_walls)):
+                solution += temp_walls[i].gen_for_solution(i)
+
+            non_improving_iterations += 1
+            
+            if instance.is_valid_solution(Solution(solution)):
+                if len(old_wall._artpieces) == 0:
+                    temp_walls.remove(old_wall)
+                    non_improving_iterations = 0
+                walls = temp_walls
+            else:
+                _, _ = new_wall.retrait_artpiece(instance.artpieces_dict[art])
+                old_wall.maj_ajout_artpiece(instance.artpieces_dict[art], x, y)
+
+            if time() - t0 > credit_temps - 5: # Respecter le crédit temps (~5s pour sauvegarder et publier)
+                break 
         
-        if instance.is_valid_solution(Solution(solution)):
-            if len(old_wall._artpieces) == 0:
-                temp_walls.remove(old_wall)
-            walls = temp_walls
-        else:
-            _, _ = new_wall.retrait_artpiece(instance.artpieces_dict[art])
-            old_wall.maj_ajout_artpiece(instance.artpieces_dict[art], x, y)
-    
-    # Regénérer la solution avec la dernière configuration autorisée (stockée dans walls)
-    solution = []
-    for i in range(len(walls)):
-        solution += walls[i].gen_for_solution(i)
+        if len(walls) < wall_star:
+            # Regénérer la solution avec la dernière configuration autorisée (stockée dans walls)
+            sol_star = []
+            for i in range(len(walls)):
+                sol_star += walls[i].gen_for_solution(i)
+            
+            wall_star = len(walls)
 
-    return Solution(solution)
+    return Solution(sol_star)
