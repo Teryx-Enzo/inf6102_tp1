@@ -24,8 +24,6 @@ class CustomWall(Wall):
         w, h = art_piece.width(), art_piece.height()
         self.matrix_place[x:x+w, y:y+h] = 1
 
-        self.max_rect_size, self.max_rect_coord = self.maximalRectangle()
-
         # Mise à jour de la liste des coins
         self.coins_bas_gauche.discard((x, y))
         if y + art_piece.height() < self.height() and x + art_piece.width() <= self.width(): # Sanity check pour éviter les erreur d'OOB
@@ -55,6 +53,13 @@ class CustomWall(Wall):
                 
             #print(self.matrix_place, self.coins_bas_gauche)
             #input('e')
+        
+        if (self.max_rect_coord[0] in range(x, x + art_piece.width()) and
+            self.max_rect_coord[1] in range(y, y + art_piece.width())):
+            self.coins_bas_gauche.discard(self.max_rect_coord)
+
+        _, self.max_rect_coord = self.maximalRectangle()
+        self.coins_bas_gauche.add(self.max_rect_coord)
 
 
     def retrait_artpiece(self, art_piece):
@@ -77,6 +82,9 @@ class CustomWall(Wall):
         
         for j in range(art_piece.height()):
             self.coins_bas_gauche.discard((x + art_piece.width(), y + j))
+        
+        _, self.max_rect_coord = self.maximalRectangle()
+        self.coins_bas_gauche.add(self.max_rect_coord)
 
         return x, y # Pour pouvoir éventuellement annuler
 
@@ -91,12 +99,19 @@ class CustomWall(Wall):
         """
 
         heights = [0] * self._w
-        for j in range(self._h):
-            for i in range(self._w):
-                if self.matrix_place[i][j] == 0:
-                    heights[i] = heights[i] + 1
-                else:
-                    heights[i] = 0
+
+        for topline in range(self._h):
+            # Si éventuellement la ligne du haut est pleine, on ira plus bas
+
+            for j in range(self._h):
+                for i in range(self._w-topline):
+                    if self.matrix_place[i][j] == 0:
+                        heights[i] = heights[i] + 1
+                    else:
+                        heights[i] = 0
+            
+            if sum(heights) != 0:
+                break
 
         if heights[0] > 0:
             max_rect_size = (self._w, heights[0])
@@ -189,7 +204,7 @@ def solve(instance: Instance) -> Solution:
 
     while time() - t0 < credit_temps:
         print("c'est parti !")
-        walls = initial_greedy(instance)
+        walls = initial_naive(instance)
         non_improving_iterations = 0
 
         while non_improving_iterations < 100: # Critère d'arrêt à définir
@@ -201,22 +216,22 @@ def solve(instance: Instance) -> Solution:
             old_wall = temp_walls[o]
             new_wall = temp_walls[n]
 
-            # À étoffer aussi : heuristique pr choisir un bon tableau
             art = choices(list(old_wall._artpieces), 
                           weights = map(lambda x: 1e-16+old_wall._artpieces[x][0]**2 + old_wall._artpieces[x][1]**2, old_wall._artpieces))[0] # On ne récupère que l'index
             x, y = old_wall.retrait_artpiece(instance.artpieces_dict[art])
+
             #print(new_wall.coins_bas_gauche, new_wall._artpieces, new_wall.matrix_place)
-            coin_bg = choices(list(new_wall.coins_bas_gauche), weights = map(lambda x: 1/(1 + x[0]*x[1]), new_wall.coins_bas_gauche))[0]
+            coin_bg = choices(list(new_wall.coins_bas_gauche), 
+                              weights = map(lambda x: 1/(1 + x[0]*x[1]), new_wall.coins_bas_gauche))[0]
             #print(new_wall.coins_bas_gauche, coin_bg, instance.artpieces_dict[art].width(), instance.artpieces_dict[art].height())
             new_wall.maj_ajout_artpiece(instance.artpieces_dict[art], *coin_bg)
 
             solution = []
             for i in range(len(temp_walls)):
                 solution += temp_walls[i].gen_for_solution(i)
-
-            non_improving_iterations += 1
             
             if instance.is_valid_solution(Solution(solution)):
+                non_improving_iterations += 1
                 if len(old_wall._artpieces) == 0:
                     temp_walls.remove(old_wall)
                     non_improving_iterations = 0
