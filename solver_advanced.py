@@ -1,6 +1,6 @@
 from utils import *
 import numpy as np
-from random import choice, choices
+from random import choice, choices, shuffle
 from tqdm import tqdm
 
 class CustomWall(Wall):
@@ -17,9 +17,19 @@ class CustomWall(Wall):
         self.coins_bas_gauche = set() ; self.coins_bas_gauche.add((0, 0))
 
     def count(self):
+        return len(self._artpieces)
+
+    def taux_remplissage(self):
+
+        compte = np.count_nonzero(self.matrix_place==0)
+        w,h = self.max_rect_size
+        area = w*h
         
+        if area > 0:
+            return area/compte
+        else:
+            return 0
         
-        return len(list(self._artpieces))
     def maj_ajout_artpiece(self, art_piece, x, y):
         #ajout du tableau au dictionnaire du mur
         self._artpieces[art_piece.get_idx()] = (x,y)
@@ -38,9 +48,9 @@ class CustomWall(Wall):
             if self.matrix_place[x, y + art_piece.height()] == 0:
                 self.coins_bas_gauche.add((x, y + art_piece.height()))
             
-            if x > 0:
-                # Coin en haut de la pièce
-                for i in range(art_piece.width()):
+            # Coin en haut de la pièce
+            for i in range(art_piece.width()):
+                if x + i > 0:
                     if (self.matrix_place[x + i - 1, y + art_piece.height()] == 1 and 
                         self.matrix_place[x + i, y + art_piece.height()] == 0):
                         self.coins_bas_gauche.add((x + i, y + art_piece.height()))
@@ -50,9 +60,9 @@ class CustomWall(Wall):
             if self.matrix_place[x + art_piece.width(), y] == 0:
                 self.coins_bas_gauche.add((x + art_piece.width(), y))
             
-            if y > 0:
-                # Coins à droite de la pièce
-                for j in range(art_piece.height()):
+            # Coins à droite de la pièce
+            for j in range(art_piece.height()):
+                if y + j > 0:
                     if (self.matrix_place[x + art_piece.width(), y + j - 1] == 1 and
                         self.matrix_place[x + art_piece.width(), y + j] == 0):
                         self.coins_bas_gauche.add((x + art_piece.width(), y + j))
@@ -132,17 +142,14 @@ def initial_naive(instance: Instance) -> List:
     return walls
 
 
-def initial_greedy(instance: Instance) -> List:
+def initial_greedy(instance,artpieces) -> List:
     """
     Génère une solution initiale gloutonne en plaçant les tableaux par surface décroissante.
     """
     walls = []
     wallw, wallh = instance.wall.width(), instance.wall.height()
 
-    # Tri des tableaux par aire décroissante.
-    artpieces = sorted(instance.artpieces_dict.items(),
-                       key = lambda x: instance.artpieces_dict[x[0]].width()*instance.artpieces_dict[x[0]].height(),
-                       reverse = True)
+    
 
     #Pour chaque oeuvre on essaye de la mettre sur un mur deja occupe
     for _, art_piece in artpieces:
@@ -172,6 +179,40 @@ def initial_greedy(instance: Instance) -> List:
     
     return walls
 
+def initial_walls(instance: Instance) -> List:
+    """
+    Génère une solution initiale gloutonne en plaçant les tableaux par surface décroissante.
+    """
+    walls = []
+    wallw, wallh = instance.wall.width(), instance.wall.height()
+
+    # Tri des tableaux par aire décroissante.
+    artpieces = sorted(instance.artpieces_dict.items(),
+                       key = lambda x: instance.artpieces_dict[x[0]].width()*instance.artpieces_dict[x[0]].height(),
+                       reverse = True)
+    
+    shuffle(list(instance.artpieces_dict.items()))
+    
+    return artpieces
+
+def deux_swap(artpieces):
+    n = len(artpieces)
+    deux_swap_neigh = []
+    artpieces = list(artpieces)
+    for i in range(n):
+        for j in range(i+1,n):
+            neigh = artpieces.copy()
+            neigh[i] = artpieces[j]
+            neigh[j] = artpieces[i]
+            deux_swap_neigh.append(neigh)
+
+    return deux_swap_neigh
+
+def metric(instance, voisin):
+
+    walls = initial_greedy(instance,voisin)
+
+    return sum([wall.count()**2 for wall in walls])
 
 def solve(instance: Instance) -> Solution:
     """Write your code here
@@ -183,57 +224,24 @@ def solve(instance: Instance) -> Solution:
         Solution: A solution object initialized with 
                   a list of tuples of the form (<artipiece_id>, <wall_id>, <x_pos>, <y_pos>)
     """
-    walls = initial_greedy(instance)
-    value = 0
 
-    for wall in walls:
-        value += wall.count()**2
+    nb_iter = 10
+    artpieces = initial_walls(instance)
+    walls = initial_greedy(instance,artpieces)
 
-    for _ in tqdm(range(1000)): # Critère d'arrêt à définir
-        temp_walls = walls.copy()
 
-        # À étoffer : choisir un mur de départ et un mur cible en particulier !
-        o = choices(range(len(temp_walls)), weights=[1/(wall.count()**2) for wall in temp_walls])[0]
-        
-        old_wall = temp_walls[o]
-        
-        new_wall_chosen = False
 
-        #on choisit un nouveau mur a condition qu'il reste des coins de libres
-        while not new_wall_chosen : 
-            try : 
-                n = choice(range(len(temp_walls)))  # Choisir 2 murs distincts ou non
-                new_wall = temp_walls[n]
-                coin_bg = choice(list(new_wall.coins_bas_gauche))
-                new_wall_chosen = True
+    value = len(walls)
+    for i in tqdm(range(nb_iter)):
 
-            except Exception as e:
-                new_wall_chosen = False
-
-        
-
-        # À étoffer aussi : heuristique pr choisir un bon tableau
-        art = choice(list(old_wall._artpieces)) # On ne récupère que l'index
-        x, y = old_wall.retrait_artpiece(instance.artpieces_dict[art])
-        
-        #print(new_wall.coins_bas_gauche, coin_bg, instance.artpieces_dict[art].width(), instance.artpieces_dict[art].height())
-        new_wall.maj_ajout_artpiece(instance.artpieces_dict[art], *coin_bg)
-
-        solution = []
-        new_value = 0
-        for i in range(len(temp_walls)):
-            solution += temp_walls[i].gen_for_solution(i)
-            new_value += temp_walls[i].count()**2
-        
-        if instance.is_valid_solution(Solution(solution)) and new_value >= value:
-            if len(old_wall._artpieces) == 0:
-                temp_walls.remove(old_wall)
-            walls = temp_walls
-            value = new_value
-            print(new_value)
-        else:
-            _, _ = new_wall.retrait_artpiece(instance.artpieces_dict[art])
-            old_wall.maj_ajout_artpiece(instance.artpieces_dict[art], x, y)
+        voisins = deux_swap(artpieces)
+        #print([metric(instance,x) for x in voisins])
+        voisins = sorted(voisins, key = lambda x: metric(instance,x), reverse = True)
+        #a = [(voisin, metric(instance,voisin)) for voisin in voisins]
+        #print(a)
+        artpieces = voisins[0]
+        print(metric(instance,artpieces))
+    walls = initial_greedy(instance,artpieces)
     
     # Regénérer la solution avec la dernière configuration autorisée (stockée dans walls)
     solution = []
