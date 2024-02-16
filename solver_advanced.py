@@ -225,7 +225,7 @@ def solve(instance: Instance) -> Solution:
                   a list of tuples of the form (<artipiece_id>, <wall_id>, <x_pos>, <y_pos>)
     """
 
-    nb_iter = 10
+    nb_iter = 3
     artpieces = initial_walls(instance)
     walls = initial_greedy(instance,artpieces)
 
@@ -234,13 +234,18 @@ def solve(instance: Instance) -> Solution:
     value = len(walls)
     for i in tqdm(range(nb_iter)):
 
+        print("génération de 2 swap")
         voisins = deux_swap(artpieces)
+        shuffle(voisins)
+        voisins = voisins
         #print([metric(instance,x) for x in voisins])
+        print("Evaluation des voisins")
         voisins = sorted(voisins, key = lambda x: metric(instance,x), reverse = True)
         #a = [(voisin, metric(instance,voisin)) for voisin in voisins]
         #print(a)
+        print("Choix du meilleur")
         artpieces = voisins[0]
-        print(metric(instance,artpieces))
+        #print(metric(instance,artpieces))
     walls = initial_greedy(instance,artpieces)
     
     # Regénérer la solution avec la dernière configuration autorisée (stockée dans walls)
