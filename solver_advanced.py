@@ -120,8 +120,9 @@ def deux_swap(artpieces):
 def metric(instance, voisin):
 
     walls = build(instance, voisin)
+    
 
-    return sum([len(wall._artpieces)**2 for wall in walls])
+    return sum([len(wall._artpieces)**2 for wall in walls])/len(walls)
 
 
 def solve(instance: Instance) -> Solution:
@@ -163,10 +164,11 @@ def solve(instance: Instance) -> Solution:
     while ((time()-t0) + iteration_duration) < credit_temps-10:
         non_improving_steps = 0
         
-        while non_improving_steps < 5 and ((time()-t0) + iteration_duration) < credit_temps-10 :
+        while non_improving_steps < 100 and ((time()-t0) + iteration_duration) < credit_temps-10 :
             #temps de départ d'une itération
             t1 = time()
             #print("génération de 2 swap")
+
             voisins = deux_swap(artpieces)
 
             #print("Evaluation des voisins")
@@ -179,6 +181,8 @@ def solve(instance: Instance) -> Solution:
                 value = metric(instance, voisins[0])
                 artpieces = voisins[0]
                 non_improving_steps = 0
+
+            
 
             #temps de départ d'une itération
             t2 = time()
@@ -193,7 +197,7 @@ def solve(instance: Instance) -> Solution:
         
         artpieces = list(instance.artpieces_dict.items())
         shuffle(artpieces)
-
+        value = metric(instance,artpieces)
 
     walls = build(instance,best_artpieces)
     
