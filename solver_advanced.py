@@ -2,6 +2,9 @@ from utils import *
 import numpy as np
 from time import time
 from tqdm import tqdm
+from random import shuffle
+
+import  matplotlib.pyplot as plt
 
 class CustomWall(Wall):
     """ 
@@ -131,6 +134,8 @@ def solve(instance: Instance) -> Solution:
         Solution: A solution object initialized with 
                   a list of tuples of the form (<artipiece_id>, <wall_id>, <x_pos>, <y_pos>)
     """
+
+    
     t0 = time()
 
     if 'hard' in instance.filepath:
@@ -138,34 +143,67 @@ def solve(instance: Instance) -> Solution:
     else:
         credit_temps = 60
         
+    iteration_duration = 0
 
     # nb_iter = 2
     artpieces = initial_greedy(instance)
+
+    
     # walls = build(instance, artpieces)
 
     value = metric(instance, artpieces)
 
-    non_improving_steps = 0
-    while time() - t0 < credit_temps:
-        while non_improving_steps < 5:
-            print("génération de 2 swap")
+
+    values = [value]
+
+    best_value = value
+    best_artpieces = artpieces.copy()
+
+    
+    while ((time()-t0) + iteration_duration) < credit_temps-10:
+        non_improving_steps = 0
+        
+        while non_improving_steps < 5 and ((time()-t0) + iteration_duration) < credit_temps-10 :
+            #temps de départ d'une itération
+            t1 = time()
+            #print("génération de 2 swap")
             voisins = deux_swap(artpieces)
-            print("Evaluation des voisins")
+
+            #print("Evaluation des voisins")
             voisins = sorted(voisins, key = lambda x: metric(instance,x), reverse = True)
 
             non_improving_steps += 1
-            print("Choix du meilleur")
-            
+            #print("Choix du meilleur")
+            values.append(metric(instance, voisins[0]))
             if metric(instance, voisins[0]) > value:
                 value = metric(instance, voisins[0])
                 artpieces = voisins[0]
                 non_improving_steps = 0
 
-    walls = build(instance,artpieces)
+            #temps de départ d'une itération
+            t2 = time()
+
+            iteration_duration = t2-t1
+
+
+
+        if value > best_value:
+            best_value = value
+            best_artpieces = artpieces
+        
+        artpieces = list(instance.artpieces_dict.items())
+        shuffle(artpieces)
+
+
+    walls = build(instance,best_artpieces)
     
     # Regénérer la solution avec la dernière configuration autorisée (stockée dans walls)
     solution = []
     for i in range(len(walls)):
         solution += walls[i].gen_for_solution(i)
+
+    plt.figure()
+    plt.plot(np.arange(len(values)),values)
+    plt.savefig('visu')
 
     return Solution(solution)
